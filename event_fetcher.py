@@ -1,10 +1,20 @@
+from pprint import pprint
+
 import requests
 import json
 import time
 import csv
 import sys
 import argparse
+from dateutil.parser import parse
 from datetime import datetime, timedelta
+from collections import OrderedDict
+from operator import itemgetter
+
+
+# Areas
+# Ireland
+# Belfast
 
 URL = 'https://ra.co/graphql'
 HEADERS = {
@@ -80,9 +90,10 @@ class EventFetcher:
             print(f"Start Time: {event_data['startTime']}")
             print(f"End Time: {event_data['endTime']}")
             print(f"Artists: {[artist['name'] for artist in event_data['artists']]}")
+            print(f"Images: {[images['filename'] for images in event_data['images']]}")
+            print(f"Image: {event_data['images'][0]['filename']}")
+            print(f"Blurb: {event_data['pick']['blurb']}")
             print(f"Venue: {event_data['venue']['name']}")
-            print(f"Event URL: {event_data['contentUrl']}")
-            print(f"Number of guests attending: {event_data['attending']}")
             print("-" * 80)
 
     def fetch_and_print_all_events(self):
@@ -123,30 +134,120 @@ class EventFetcher:
         return all_events
 
     def save_events_to_csv(self, events, output_file="events.csv"):
-        """
-        Save events to a CSV file.
+        
+        fullEvents = []
+        #  fullVenues = []
+        
+        for event in events:
+            
+            dt = parse(event["event"]["date"])
+            print(dt.strftime('%a %e %B'))
+        
+            try:
+                # if event.get('event') != None and event['event'].get('pick') != None and event['event']['pick'].get('blurb') != None:
+                    eventBlank = {
+                        "id": int(event['id']),
+                        "__id__": int(event['id']),
+                        "__created__": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        "__updated__": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        # "InstagramUrl": "https://www.google.com/search?q=" + event["event"]['title'] + " instagram",
+                        "country": "Ireland",
+                        "date": event["event"]['date'],
+                        "dateFormatted": dt.strftime('%a %e %B'),
+                        "dateTimestamp": event["event"]['date'],
+                        "description": "",
+                        "djs": ', '.join([artist['name'] for artist in event["event"]['artists']]),
+                        "endTime": event["event"]['date'],
+                        # "facebookLink": "https://www.google.com/search?q=" + event["event"]['title'] + " facebook",
+                        "imageUrl": event['event']['images'][0]['filename'],  
+                        "images": ', '.join([images['filename'] for images in event["event"]['images']]),
+                        "startTime": event["event"]['date'],
+                        "ticketUrl": "https://www.google.com/search?q=" + event["event"]['title'] + " tickets",
+                        "title": event["event"]['title'],
+                        # "twitterUrl": "https://www.google.com/search?q=" + event["event"]['title'] + " twitter",
+                        "venue": event["event"]["venue"]['name'],
+                        "venueId": int(event["event"]["venue"]['id']),
+                        "views": 0
+                    }
+                    fullEvents.append(eventBlank)
+                    
+                    
+            except (TypeError, IndexError):
+                pass
+                           
+            
+        # # for event in events: 
+        
+        # fullVenues = []
+        
+        # for event in events:
+            
+        #    try:
+        #         # if event.get('event') != None and event['event'].get('pick') != None and event['event']['pick'].get('blurb') != None:
+        #             venueBlank = {
+        #                 "id": int(event["event"]["venue"]['id']),
+        #                 "__id__": int(event["event"]["venue"]['id']),
+        #                 "imageUrl": "https://i.imgur.com/sT65EW4.png", 
+        #                 "title": event["event"]["venue"]['name'],
+        #                  "InstagramUrl": "https://www.google.com/search?q=" + event["event"]["venue"]['name'] + " instagram",
+        #                  "country": "Ireland",
+        #                   "facebookLink": "https://www.google.com/search?q=" + event["event"]["venue"]['name'] + " facebook",
+        #                   "twitterUrl": "https://www.google.com/search?q=" + event["event"]["venue"]['name'] + " twitter",
+        #             }
+        #             fullVenues.append(venueBlank)
+                    
+                    
+        #    except (TypeError, IndexError):
+        #         pass
+         
+        uniq = []
+        for i in fullEvents:
+            if not i in uniq:
+                uniq.append(i)
+                
+        newlist = sorted(uniq, key=itemgetter('id'))
 
-        :param events: A list of events.
-        :param output_file: The output file path. (default: "events.csv")
-        """
-        with open(output_file, "w", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(["Event name", "Date", "Start Time", "End Time", "Artists",
-                             "Venue", "Event URL", "Number of guests attending"])
+        # fullVenues = list(dict.fromkeys(fullVenues))
+        
 
-            for event in events:
-                event_data = event["event"]
-                writer.writerow([event_data['title'], event_data['date'], event_data['startTime'],
-                                 event_data['endTime'], ', '.join([artist['name'] for artist in event_data['artists']]),
-                                 event_data['venue']['name'], event_data['contentUrl'], event_data['attending']])
+        with open('dataBelfast1.json', 'w', encoding='utf-8') as f:
+            json.dump(newlist, f, ensure_ascii=False, indent=4)
+               
+        # with open('venuesIreland.json', 'w', encoding='utf-8') as f:
+        #     json.dump(newlist, f, ensure_ascii=False, indent=4)
+
+        # """
+        # Save events to a CSV file.
+
+        # :param events: A list of events.
+        # :param output_file: The output file path. (default: "events.csv")
+        # """
+        # with open(output_file, "w", newline="", encoding="utf-8") as file:
+        #     writer = csv.writer(file)
+        #     writer.writerow(["Event name", "Date", "Start Time", "End Time",
+        #                      "Artists", "Images", "Venue"])
+        #     filtered = []        
+        #     for event in events:
+        #         event_data = event["event"]
+        #         writer.writerow([event_data['title'],
+        #                          event_data['date'],
+        #                          event_data['startTime'],
+        #                          event_data['endTime'],
+        #                          ', '.join(
+            # [artist['name'] for artist in event_data['artists']]),
+        #                          ', '.join([images['filename'] for images in event_data['images']]),
+        #                         #  event_data['images'][0]['filename'],
+        #                          event_data['venue']['name']])
 
 
 def main():
     parser = argparse.ArgumentParser(description="Fetch events from ra.co and save them to a CSV file.")
     parser.add_argument("areas", type=int, help="The area code to filter events.")
-    parser.add_argument("start_date", type=str, help="The start date for event listings (inclusive, format: YYYY-MM-DD).")
+    parser.add_argument("start_date", type=str,
+                        help="The start date for event listings (inclusive, format: YYYY-MM-DD).")
     parser.add_argument("end_date", type=str, help="The end date for event listings (inclusive, format: YYYY-MM-DD).")
-    parser.add_argument("-o", "--output", type=str, default="events.csv", help="The output file path (default: events.csv).")
+    parser.add_argument("-o", "--output", type=str, default="events.csv",
+                        help="The output file path (default: events.csv).")
     args = parser.parse_args()
 
     listing_date_gte = f"{args.start_date}T00:00:00.000Z"
@@ -169,3 +270,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+#  python event_fetcher.py 13 2023-04-23 2023-04-29 -o events.csv  
+#  python event_fetcher.py 35 2024-11-30  2025-05-31 -o events38.csv ; BELFAST

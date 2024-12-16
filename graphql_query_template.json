@@ -8,7 +8,7 @@
                 "lte": "__LISTING_DATE_LTE__"
             }
         },
-        "filterOptions": {"genre": true},
+        "filterOptions": {"genre": false},
         "pageSize": 20,
         "page": 1
     },

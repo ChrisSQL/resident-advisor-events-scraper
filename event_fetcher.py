@@ -10,6 +10,11 @@ from dateutil.parser import parse
 from datetime import datetime, timedelta
 from collections import OrderedDict
 from operator import itemgetter
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import db
+import random
+import re
 
 
 # Areas
@@ -24,6 +29,18 @@ HEADERS = {
 }
 QUERY_TEMPLATE_PATH = "graphql_query_template.json"
 DELAY = 1  # Adjust this value as needed
+
+# Fetch the service account key JSON file contents
+cred = credentials.Certificate('sesh-75fbc-a44a1dc12932-rakey.json')
+
+# Initialize the app with a service account, granting admin privileges
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://sesh-75fbc-default-rtdb.europe-west1.firebasedatabase.app/'
+})
+
+# As an admin, the app has access to read and write all data, regradless of Security Rules
+
+
 
 
 class EventFetcher:
@@ -95,6 +112,8 @@ class EventFetcher:
             print(f"Blurb: {event_data['pick']['blurb']}")
             print(f"Venue: {event_data['venue']['name']}")
             print("-" * 80)
+            
+
 
     def fetch_and_print_all_events(self):
         """
@@ -136,24 +155,25 @@ class EventFetcher:
     def save_events_to_csv(self, events, output_file="events.csv"):
         
         fullEvents = []
-        #  fullVenues = []
+        fullVenues = []
         
         for event in events:
             
             dt = parse(event["event"]["date"])
-            print(dt.strftime('%a %e %B'))
+            # print(event["event"]['title'])
         
             try:
                 # if event.get('event') != None and event['event'].get('pick') != None and event['event']['pick'].get('blurb') != None:
                     eventBlank = {
                         "id": int(event['id']),
                         "__id__": int(event['id']),
-                        "__created__": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        "__updated__": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        "created": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        "updated": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                         # "InstagramUrl": "https://www.google.com/search?q=" + event["event"]['title'] + " instagram",
                         "country": "Ireland",
                         "date": event["event"]['date'],
                         "dateFormatted": dt.strftime('%a %e %B'),
+                        "dateFormattedShort": dt.strftime('%a, %e %b'),
                         "dateTimestamp": event["event"]['date'],
                         "description": "",
                         "djs": ', '.join([artist['name'] for artist in event["event"]['artists']]),
@@ -162,56 +182,111 @@ class EventFetcher:
                         "imageUrl": event['event']['images'][0]['filename'],  
                         "images": ', '.join([images['filename'] for images in event["event"]['images']]),
                         "startTime": event["event"]['date'],
-                        "ticketUrl": "https://www.google.com/search?q=" + event["event"]['title'] + " tickets",
+                        "ticketUrl": "https://www.google.com/search?q=" + event["event"]["venue"]['name'] + " " + event["event"]['title'] + " tickets",
                         "title": event["event"]['title'],
                         # "twitterUrl": "https://www.google.com/search?q=" + event["event"]['title'] + " twitter",
                         "venue": event["event"]["venue"]['name'],
-                        "venueId": int(event["event"]["venue"]['id']),
-                        "views": 0
+                        "venueId": int(event["event"]["venue"]['id'])
                     }
-                    fullEvents.append(eventBlank)
                     
+                    venueBlank = {
+                        "id": int(event["event"]["venue"]['id']),
+                        "country": "Ireland",
+                        "description": "",
+                        "imageUrl": "https://i.imgur.com/sT65EW4.png",
+                        "title": event["event"]["venue"]['name'],
+                        "venueId": int(event["event"]["venue"]['id']),
+                        "itemType": "Venues"
+                    }
+                    
+                    fullVenues.append(venueBlank)                  
+                    db.reference('venues/'+event["event"]["venue"]['id']).update(venueBlank)
+                    
+                    fullEvents.append(eventBlank)
+                    db.reference('events/'+event['id']).update(eventBlank)
                     
             except (TypeError, IndexError):
                 pass
-                           
             
-        # # for event in events: 
-        
-        # fullVenues = []
-        
-        # for event in events:
-            
-        #    try:
-        #         # if event.get('event') != None and event['event'].get('pick') != None and event['event']['pick'].get('blurb') != None:
-        #             venueBlank = {
-        #                 "id": int(event["event"]["venue"]['id']),
-        #                 "__id__": int(event["event"]["venue"]['id']),
-        #                 "imageUrl": "https://i.imgur.com/sT65EW4.png", 
-        #                 "title": event["event"]["venue"]['name'],
-        #                  "InstagramUrl": "https://www.google.com/search?q=" + event["event"]["venue"]['name'] + " instagram",
-        #                  "country": "Ireland",
-        #                   "facebookLink": "https://www.google.com/search?q=" + event["event"]["venue"]['name'] + " facebook",
-        #                   "twitterUrl": "https://www.google.com/search?q=" + event["event"]["venue"]['name'] + " twitter",
-        #             }
-        #             fullVenues.append(venueBlank)
-                    
-                    
-        #    except (TypeError, IndexError):
-        #         pass
          
-        uniq = []
-        for i in fullEvents:
-            if not i in uniq:
-                uniq.append(i)
+        # uniq = []
+        # for i in fullEvents:
+        #     if not i in uniq:
+        #         uniq.append(i)
                 
-        newlist = sorted(uniq, key=itemgetter('id'))
+        # newlist = sorted(uniq, key=itemgetter('id'))
 
         # fullVenues = list(dict.fromkeys(fullVenues))
         
 
-        with open('dataBelfast1.json', 'w', encoding='utf-8') as f:
-            json.dump(newlist, f, ensure_ascii=False, indent=4)
+        # with open('dataIE.json', 'w', encoding='utf-8') as f:
+        #     json.dump(newlist, f, ensure_ascii=False, indent=4)
+               
+        # with open('venuesIreland.json', 'w', encoding='utf-8') as f:
+        #     json.dump(newlist, f, ensure_ascii=False, indent=4)
+
+        # """
+        # Save events to a CSV file.
+
+        # :param events: A list of events.
+        # :param output_file: The output file path. (default: "events.csv")
+        # """
+        # with open(output_file, "w", newline="", encoding="utf-8") as file:
+        #     writer = csv.writer(file)
+        #     writer.writerow(["Event name", "Date", "Start Time", "End Time",
+        #                      "Artists", "Images", "Venue"])
+        #     filtered = []        
+        #     for event in events:
+        #         event_data = event["event"]
+        #         writer.writerow([event_data['title'],
+        #                          event_data['date'],
+        #                          event_data['startTime'],
+        #                          event_data['endTime'],
+        #                          ', '.join(
+            # [artist['name'] for artist in event_data['artists']]),
+        #                          ', '.join([images['filename'] for images in event_data['images']]),
+        #                         #  event_data['images'][0]['filename'],
+        #                          event_data['venue']['name']])
+        
+        
+        # Create List Of Artists
+        fullArtists = []
+        
+        for event in events:
+            try:
+                # if event.get('event') != None and event['event'].get('pick') != None and event['event']['pick'].get('blurb') != None:
+                    
+                    for artist in event["event"]['artists']:
+                        artistBlank = {
+                        "name": artist['name']
+                        }   
+                        fullArtists.append(artistBlank)   
+                        # cleanName = re.sub(r'[^a-zA-Z0-9]', '', artistBlank['name'])                                     
+                        # print(cleanName)
+                        
+                    
+     
+            except (TypeError, IndexError):
+                pass
+        
+        # Create List Of Artists
+        for artists in fullArtists:
+          cleanName = re.sub(r'[^a-zA-Z0-9]', '', artists['name']) 
+          print(cleanName)
+          db.reference('artists/'+cleanName).update(artists)
+
+        # uniq = []
+        # for i in fullEvents:
+        #     if not i in uniq:
+        #         uniq.append(i)
+                
+        # newlist = sorted(uniq, key=itemgetter('id'))
+
+        # fullVenues = list(dict.fromkeys(fullVenues))
+        
+
+        # with open('dataIE.json', 'w', encoding='utf-8') as f:
+        #     json.dump(newlist, f, ensure_ascii=False, indent=4)
                
         # with open('venuesIreland.json', 'w', encoding='utf-8') as f:
         #     json.dump(newlist, f, ensure_ascii=False, indent=4)
@@ -272,5 +347,6 @@ if __name__ == "__main__":
     main()
 
 
-#  python event_fetcher.py 13 2023-04-23 2023-04-29 -o events.csv  
-#  python event_fetcher.py 35 2024-11-30  2025-05-31 -o events38.csv ; BELFAST
+#  python event_fetcher.py 13 2024-12-16 2025-04-29 -o events.csv  LONDON
+#  python event_fetcher.py 35 2024-12-17  2025-08-24 -o events38.csv ; BELFAST
+#  python event_fetcher.py 43 2024-12-16 2025-08-29 -o events38.csv ;   

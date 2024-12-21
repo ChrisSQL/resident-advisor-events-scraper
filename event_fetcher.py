@@ -1,3 +1,4 @@
+import argparse
 from pprint import pprint
 
 import requests
@@ -5,8 +6,6 @@ import json
 import time
 import csv
 import sys
-import argparse
-from dateutil.parser import parse
 from datetime import datetime, timedelta
 from collections import OrderedDict
 from operator import itemgetter
@@ -159,8 +158,9 @@ class EventFetcher:
         
         for event in events:
             
-            dt = parse(event["event"]["date"])
-            # print(event["event"]['title'])
+
+            dt = datetime.strptime(event["event"]["date"], '%Y-%m-%dT00:00:00.000')
+            # dt = datetime.strptime(event["event"]["date"], '%Y-%m-%dT00:00:00.000')
         
             try:
                 # if event.get('event') != None and event['event'].get('pick') != None and event['event']['pick'].get('blurb') != None:
@@ -200,10 +200,10 @@ class EventFetcher:
                     }
                     
                     fullVenues.append(venueBlank)                  
-                    db.reference('venues/'+event["event"]["venue"]['id']).update(venueBlank)
+                    # db.reference('venues/'+event["event"]["venue"]['id']).update(venueBlank)
                     
                     fullEvents.append(eventBlank)
-                    db.reference('events/'+event['id']).update(eventBlank)
+                    # db.reference('events/'+event['id']).update(eventBlank)
                     
             except (TypeError, IndexError):
                 pass
@@ -273,20 +273,20 @@ class EventFetcher:
         for artists in fullArtists:
           cleanName = re.sub(r'[^a-zA-Z0-9]', '', artists['name']) 
           print(cleanName)
-          db.reference('artists/'+cleanName).update(artists)
+          # db.reference('artists/'+cleanName).update(artists)
 
-        # uniq = []
-        # for i in fullEvents:
-        #     if not i in uniq:
-        #         uniq.append(i)
+        uniq = []
+        for i in fullEvents:
+            if not i in uniq:
+                uniq.append(i)
                 
-        # newlist = sorted(uniq, key=itemgetter('id'))
+        newlist = sorted(uniq, key=itemgetter('id'))
 
         # fullVenues = list(dict.fromkeys(fullVenues))
         
 
-        # with open('dataIE.json', 'w', encoding='utf-8') as f:
-        #     json.dump(newlist, f, ensure_ascii=False, indent=4)
+        with open('dataIE.json', 'w', encoding='utf-8') as f:
+            json.dump(newlist, f, ensure_ascii=False, indent=4)
                
         # with open('venuesIreland.json', 'w', encoding='utf-8') as f:
         #     json.dump(newlist, f, ensure_ascii=False, indent=4)

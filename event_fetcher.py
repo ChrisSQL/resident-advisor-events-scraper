@@ -14,6 +14,13 @@ from firebase_admin import credentials
 from firebase_admin import db
 import random
 import re
+from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut, GeocoderServiceError
+import googlemaps
+import requests
+from bs4 import BeautifulSoup
+import constants
+
 
 
 # Areas
@@ -40,9 +47,71 @@ firebase_admin.initialize_app(cred, {
 # As an admin, the app has access to read and write all data, regradless of Security Rules
 
 
+def address_to_latlong(address: str):
+    """
+    Converts a string address into latitude and longitude coordinates.
 
+    Args:
+        address (str): The address to geocode.
+
+    Returns:
+        tuple: (latitude, longitude) if successful, None otherwise.
+    """
+    try:
+        geolocator = Nominatim(user_agent="business_locator")
+        location = geolocator.geocode(address)
+
+        if location:
+            return (location.latitude, location.longitude)
+        else:
+            print("Address not found.")
+            return None
+
+    except GeocoderTimedOut:
+        print("The geocoding service timed out. Please try again.")
+        return None
+    except GeocoderServiceError:
+        print("The geocoding service encountered an error.")
+        return None
+
+def business_to_latlong_google(business_name: str, api_key: str):
+    gmaps = googlemaps.Client(key=api_key)
+    geocode_result = gmaps.geocode(business_name)
+    if geocode_result:
+        location = geocode_result[0]['geometry']['location']
+        return (location['lat'], location['lng'])
+    else:
+        print("Business not found.")
+        return None
+
+def fetch_image(query):
+    """Fetches an image based on a text query.
+
+    Args:
+        query (str): The text description of the image.
+
+    Returns:
+        str: The URL of the image, or None if no image is found.
+    """
+
+    search_url = f"https://www.google.com/search?q={query}&tbm=isch"
+
+    response = requests.get(search_url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+
+    # Find the first image result
+    image_tag = soup.find('img')
+    if image_tag:
+        image_url = image_tag['src']
+        return image_url
+    else:
+        return None
 
 class EventFetcher:
+
+
+
+
     """
     A class to fetch and print event details from RA.co
     """
@@ -164,45 +233,50 @@ class EventFetcher:
         
             try:
                 # if event.get('event') != None and event['event'].get('pick') != None and event['event']['pick'].get('blurb') != None:
-                    eventBlank = {
-                        "id": int(event['id']),
-                        "__id__": int(event['id']),
-                        "created": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        "updated": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        # "InstagramUrl": "https://www.google.com/search?q=" + event["event"]['title'] + " instagram",
-                        "country": "Ireland",
-                        "date": event["event"]['date'],
-                        "dateFormatted": dt.strftime('%a %e %B'),
-                        "dateFormattedShort": dt.strftime('%a, %e %b'),
-                        "dateTimestamp": event["event"]['date'],
-                        "description": "",
-                        "djs": ', '.join([artist['name'] for artist in event["event"]['artists']]),
-                        "endTime": event["event"]['date'],
-                        # "facebookLink": "https://www.google.com/search?q=" + event["event"]['title'] + " facebook",
-                        "imageUrl": event['event']['images'][0]['filename'],  
-                        "images": ', '.join([images['filename'] for images in event["event"]['images']]),
-                        "startTime": event["event"]['date'],
-                        "ticketUrl": "https://www.google.com/search?q=" + event["event"]["venue"]['name'] + " " + event["event"]['title'] + " tickets",
-                        "title": event["event"]['title'],
-                        # "twitterUrl": "https://www.google.com/search?q=" + event["event"]['title'] + " twitter",
-                        "venue": event["event"]["venue"]['name'],
-                        "venueId": int(event["event"]["venue"]['id'])
-                    }
+                #     eventBlank = {
+                #         "id": int(event['id']),
+                #         "__id__": int(event['id']),
+                #         "created": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                #         "updated": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                #         # "InstagramUrl": "https://www.google.com/search?q=" + event["event"]['title'] + " instagram",
+                #         "country": "Ireland",
+                #         "date": event["event"]['date'],
+                #         "dateFormatted": dt.strftime('%a %e %B'),
+                #         "dateFormattedShort": dt.strftime('%a, %e %b'),
+                #         "dateTimestamp": event["event"]['date'],
+                #         "description": "",
+                #         "djs": ', '.join([artist['name'] for artist in event["event"]['artists']]),
+                #         "endTime": event["event"]['date'],
+                #         # "facebookLink": "https://www.google.com/search?q=" + event["event"]['title'] + " facebook",
+                #         "imageUrl": event['event']['images'][0]['filename'],
+                #         "images": ', '.join([images['filename'] for images in event["event"]['images']]),
+                #         "startTime": event["event"]['date'],
+                #         "ticketUrl": "https://www.google.com/search?q=" + event["event"]["venue"]['name'] + " " + event["event"]['title'] + " tickets",
+                #         "title": event["event"]['title'],
+                #         # "twitterUrl": "https://www.google.com/search?q=" + event["event"]['title'] + " twitter",
+                #         "venue": event["event"]["venue"]['name'],
+                #         "venueId": int(event["event"]["venue"]['id'])
+                #     }
                     
                     venueBlank = {
                         "id": int(event["event"]["venue"]['id']),
                         "country": "Ireland",
                         "description": "",
-                        "imageUrl": "https://i.imgur.com/sT65EW4.png",
+                        "imageUrl": fetch_image(event["event"]["venue"]['name'] + " nightclub Ireland"),
                         "title": event["event"]["venue"]['name'],
                         "venueId": int(event["event"]["venue"]['id']),
-                        "itemType": "Venues"
+                        "itemType": "Venues",
+                        # "latlng": address_to_latlong(event["event"]["venue"]['name'] + " Ireland")
+                         "latlng": business_to_latlong_google(event["event"]["venue"]['name'],
+                                                             constants.maps)
                     }
+
+                    # "https://i.imgur.com/sT65EW4.png"
                     
-                    fullVenues.append(venueBlank)                  
-                    # db.reference('venues/'+event["event"]["venue"]['id']).update(venueBlank)
+                    fullVenues.append(venueBlank)
+                    db.reference('venues/'+event["event"]["venue"]['id']).update(venueBlank)
                     
-                    fullEvents.append(eventBlank)
+                    # fullEvents.append(eventBlank)
                     # db.reference('events/'+event['id']).update(eventBlank)
                     
             except (TypeError, IndexError):
